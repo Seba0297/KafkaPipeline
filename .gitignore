@@ -2,3 +2,5 @@
 .Ink
 .ink
 *.lnk
+/target/*
+/out

@@ -71,6 +71,11 @@ class StageB2Runnable implements Runnable {
             while (running) {
                 if (!recovered) {
                     seekToBeginning();
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                     recovery();
                     recovered = true;
                 }
