@@ -4,3 +4,16 @@
 *.lnk
 /target/*
 /out
+src/main/java/META-INF/MANIFEST.MF
+target/classes/Consumer.class
+target/classes/ConsumerRunnable.class
+target/classes/META-INF/KafkaPipeline.kotlin_module
+target/classes/Producer.class
+target/classes/StageB2Runnable.class
+target/classes/Consumer.class
+target/classes/ConsumerRunnable.class
+target/classes/META-INF/KafkaPipeline.kotlin_module
+target/classes/Producer.class
+target/classes/StageB2Runnable.class
+*.class
+*.kotlin_module
