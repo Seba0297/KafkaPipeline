@@ -47,14 +47,14 @@ public class Producer {
      *
      * @return the properties to be set as "Producer Properties"
      */
-    private static Properties createProperties() {
+    private static Properties createProperties(String ip) {
         Properties props = new Properties();
 
         /*
             Property "bootstrap.servers" represent here a host:port pair that is
             the address of one brokers in a Kafka cluster
          */
-        props.put("bootstrap.servers", "localhost:9092");
+        props.put("bootstrap.servers", ip + ":9092");
         /*
             Properties "key/value.serializer instruct how to turn the key and value
              objects the user provides with their ProducerRecord into bytes.
@@ -84,16 +84,23 @@ public class Producer {
         final String topic = "covidData";
 
         final int numMessages = 3;
+        String ipServer = "localhost";
+
+        if (args.length > 0)
+            ipServer = args[0];
+
+        System.out.println("[Connecting to " + ipServer + "...]");
 
         /*
             Setting new properties for producer
          */
-        final Properties props = createProperties();
+        final Properties props = createProperties(ipServer);
         /*
             Create the instance for a producer, using properties created just before
          */
         final KafkaProducer<String, String> producer = new KafkaProducer<>(props);
 
+        System.out.println("[Connected]");
         /*
             Needs to be called before any other methods when the transactional.id is set in the configuration.
             This method does the following:

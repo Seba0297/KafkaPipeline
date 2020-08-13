@@ -15,20 +15,26 @@ import java.util.concurrent.TimeUnit;
 public class Consumer {
     public static void main(String[] args) throws InterruptedException {
 		/*
-			Usage: AutoCommitConsumer <group> <initialId> <numConsumers> <topic> [<topic>*]
+			Usage: Consumer <group> <initialId> <numConsumers>
 			group2 1 3
 		 */
-        if (args.length < 3) {
+        if (args.length < 1) {
             err();
         }
 
-        final String group = args[0];
-        final int initialId = Integer.parseInt(args[1]);
-        final int numConsumers = Integer.parseInt(args[2]);
+        final String group = "GroupConsumer";
+        final int initialId = 1;
+        final int numConsumers = Integer.parseInt(args[0]);
+        String ipServer = "localhost";
+
+        if (args.length == 2)
+            ipServer = args[1];
+
         final List<String> topic = Collections.singletonList("covidStats");
 
-        final Properties consumerProps = createConsumerProperties(group);
+        final Properties consumerProps = createConsumerProperties(group, ipServer);
 
+        System.out.println("[Connecting to " + ipServer + "...]");
         final ExecutorService executor = Executors.newFixedThreadPool(numConsumers);
         for (int i = 0; i < numConsumers; i++) {
             final int id = initialId + i;
@@ -40,7 +46,7 @@ public class Consumer {
     }
 
     private static void err() {
-        System.out.println("Usage: Consumer <group> <initialId> <numConsumers>");
+        System.out.println("Usage: Consumer <numConsumers> <ipServer>");
         System.exit(1);
     }
 
@@ -49,14 +55,14 @@ public class Consumer {
      *
      * @return the properties to be set as "Consumer Properties"
      */
-    private static Properties createConsumerProperties(String group) {
+    private static Properties createConsumerProperties(String group, String ip) {
 
         final Properties consumerProps = new Properties();
         /*
             Property "bootstrap.servers" represent here a host:port pair that is
             the address of one brokers in a Kafka cluster
          */
-        consumerProps.put("bootstrap.servers", "localhost:9092");
+        consumerProps.put("bootstrap.servers", ip + ":9092");
         /*
             A unique string that identifies the consumer group this consumer belongs to.
          */
@@ -104,7 +110,7 @@ class ConsumerRunnable implements Runnable {
     @Override
     public void run() {
         try {
-            System.out.println("Topics: " + topics);
+            System.out.println("[Consumer " + id + "]: Connected. Topic: " + topics);
             consumer.subscribe(topics);
             while (running) {
                 final ConsumerRecords<String, String> records = consumer.poll(Duration.of(10, ChronoUnit.SECONDS));
