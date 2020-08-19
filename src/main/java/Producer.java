@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.util.Properties;
 import java.util.Random;
+import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -40,7 +41,10 @@ public class Producer {
             "Valle d’Aosta",
             "Veneto"
     };
+    // used in randomized value
     private static final int disease = 14;
+
+    static KafkaProducer<String, String> producer;
 
     /**
      * This method create an instance of type "Properties
@@ -80,10 +84,6 @@ public class Producer {
 
     public static void main(String[] args) {
 
-        //Topics will be managed as strings
-        final String topic = "covidData";
-
-        final int numMessages = 3;
         String ipServer = "localhost";
 
         if (args.length > 0)
@@ -98,7 +98,7 @@ public class Producer {
         /*
             Create the instance for a producer, using properties created just before
          */
-        final KafkaProducer<String, String> producer = new KafkaProducer<>(props);
+        producer = new KafkaProducer<>(props);
 
         System.out.println("[Connected]");
         /*
@@ -113,10 +113,35 @@ public class Producer {
             Once the transactional state has been successfully initialized, this method should no longer be used.
          */
         producer.initTransactions();
+        try {
+            menu();
+        } catch (NumberFormatException e) {
+            System.err.println("Please enter a valid option");
+            menu();
+        }
 
-        final Random r = new Random();
+    }
 
-        for (int i = 0; i < numMessages; i++) {
+    /**
+     * This method produces data of people and sends records to Kafka
+     *
+     * @param random: if set to true, it will produce data for deaths/recovered, following a default disease ratio
+     */
+    private static void produceValues(boolean random) {
+
+        //Topics will be managed as strings
+        final String topic = "covidData";
+        int howMany = 1;
+
+        // Establishing how many records will be produced
+        do {
+            System.out.print("How many messages? ");
+            howMany = (new Scanner(System.in)).nextInt();
+        } while (howMany <= 0);
+
+        Random r = new Random();
+
+        for (int i = 0; i < howMany; i++) {
 
             //Set a value in this format -> Name#Sex#Age#Region#Status
             String value =
@@ -132,7 +157,17 @@ public class Producer {
             // Probability for a positive to die is "disease"/100, i.e. over 100 people, the disease% dies
             // D -> death
             // R -> Recover
-            value = value + "#" + ((r.nextInt(100 / disease) == 0) ? "D" : "R");
+            if (random)
+                value = value + "#" + ((r.nextInt(100 / disease) == 0) ? "D" : "R");
+            else {
+                String c;
+                // User set manually the status of Covid-19 positive.
+                do {
+                    System.out.print("Insert R/D: ");
+                    c = (new Scanner(System.in)).next().toUpperCase();
+                } while (!c.equals("R") && !c.equals("D"));
+                value = value + "#" + c;
+            }
 
             if (print) {
                 System.out.print("Topic: " + topic + "\t");
@@ -239,7 +274,6 @@ public class Producer {
             Close this producer. This method blocks until all previously sent requests complete.
          */
         producer.close();
-
     }
 
     /**
@@ -283,6 +317,45 @@ public class Producer {
 
         return sb.toString();
 
+    }
+
+    /**
+     * Prints a menu for the application
+     *
+     * @throws NumberFormatException in case of not Integer values as input
+     */
+    private static void menu() throws NumberFormatException {
+        Scanner scanner = new Scanner(System.in);
+
+        int swValue;
+
+        // Display menu graphics
+        System.out.println("============================");
+        System.out.println("|   MENU SELECTION DEMO    |");
+        System.out.println("============================");
+        System.out.println("| Options:                 |");
+        System.out.println("|        1. Random Values  |");
+        System.out.println("|        2. Manual Values  |");
+        System.out.println("|        3. Exit           |");
+        System.out.println("============================");
+        System.out.print("Select option: ");
+        swValue = Integer.parseInt(scanner.nextLine());
+
+        // Switch construct for Menu
+        switch (swValue) {
+            case 1:
+                produceValues(true);
+                break;
+            case 2:
+                produceValues(false);
+                break;
+            case 3:
+                System.out.println("Exit selected");
+                System.exit(1);
+                break;
+            default:
+                System.out.println("Invalid selection");
+        }
     }
 
 }

@@ -14,21 +14,26 @@ import java.util.concurrent.Executors;
 
 public class StageC extends Stage {
 
-    public StageC(String group, String transactionalID, int numConsumers) throws InterruptedException {
+    public StageC(String group, String transactionalID, int numConsumers) {
+        // Super constructor for class Stage, which sets consumer and producer properties.
         super(group, transactionalID, numConsumers);
+
         int initialId = 1;
+        /*
+            Pipeline schema:
+                (covidData) -> Stage A ---> (covidStageB1) -> Stage B1 ---> (covidStageC) -> Stage C -> (covidStats)
+                                        |-> (covidStageB2) -> Stage B2 -|
+         */
         List<String> inTopics = new ArrayList<>(List.of("covidStageC"));
         List<String> outTopics = Collections.singletonList("covidStats");
-        ExecutorService executor = Executors.newFixedThreadPool(numConsumers);
 
+        ExecutorService executor = Executors.newFixedThreadPool(numConsumers);
         for (int i = 0; i < numConsumers; i++) {
             final int id = initialId + i;
             executor.submit(new StageCRunnable(id, consumerProps, producerProps, group, inTopics, outTopics));
         }
         executor.shutdown();
-
     }
-
 }
 
 class StageCRunnable implements Runnable {
@@ -39,7 +44,6 @@ class StageCRunnable implements Runnable {
     private final KafkaConsumer<String, String> consumer;
     private final KafkaProducer<String, String> producer;
     private final String group;
-    private final Random rand = new Random();
     private final boolean abortTest;
     private final boolean running;
     private final boolean recovered;
@@ -68,12 +72,29 @@ class StageCRunnable implements Runnable {
 
     @Override
     public void run() {
-
+        /*
+            Subscribe to the given list of topics to get dynamically assigned partitions.
+         */
         consumer.subscribe(inTopics);
+         /*
+                Needs to be called before any other methods when the transactional.id is set in the configuration.
+                This method does the following:
+                    1.  Ensures any transactions initiated by previous instances of the producer with the same
+                        transactional.id are completed. If the previous instance had failed with a transaction in progress,
+                        it will be aborted. If the last transaction had begun completion, but not yet finished,
+                        this method awaits its completion.
+                    2.  Gets the internal producer id and epoch, used in all future transactional messages
+                        issued by the producer.
+                Once the transactional state has been successfully initialized, this method should no longer be used.
+            */
         producer.initTransactions();
 
         while (running) {
+            /*
+                Fetch data for the topics or partitions specified using one of the subscribe/assign APIs
+            */
             final ConsumerRecords<String, String> records = consumer.poll(Duration.of(10, ChronoUnit.SECONDS));
+
             producer.beginTransaction();
             for (final ConsumerRecord<String, String> record : records) {
 
@@ -97,40 +118,20 @@ class StageCRunnable implements Runnable {
                 String outTopic = outTopics.get(0);
                 producer.send(new ProducerRecord<>(outTopic, key, valueToSend));
                 println(">>> Forwarding to " + outTopic + ": " + valueToSend);
-
-                /*
-                String key = record.key();
-                String value = record.value();
-                println("\t <<< Received: " + key + " : " + value);
-                int positives = Integer.parseInt(value.split("#")[0]);
-                int recovered = Integer.parseInt(value.split("#")[1]);
-                String ratio = String.format("%.02f", ((float) recovered / positives) * 100);
-                String valueToSend =
-                        "Overall cases: " + positives +
-                                "\tRecovered: " + recovered +
-                                "\tRecovery ratio: " + ratio + "%";
-                producer.send(new ProducerRecord<>(outTopics.get(0), key, valueToSend));
-                println(">>> Sending: " + valueToSend);
-
-              */
             }
 
-            // The producer manually commits the outputs for the consumer within the
-            // transaction
+            // The producer manually commits the outputs for the consumer within the transaction
             final Map<TopicPartition, OffsetAndMetadata> map = new HashMap<>();
             for (final TopicPartition partition : records.partitions()) {
                 final List<ConsumerRecord<String, String>> partitionRecords = records.records(partition);
                 final long lastOffset = partitionRecords.get(partitionRecords.size() - 1).offset();
                 map.put(partition, new OffsetAndMetadata(lastOffset + 1));
             }
-
             producer.sendOffsetsToTransaction(map, group);
             producer.commitTransaction();
         }
-
         consumer.close();
         producer.close();
-
     }
 
     private String computeStatsForDeaths(String value) {
@@ -158,7 +159,6 @@ class StageCRunnable implements Runnable {
                 String.format("%.02f", percentageMale);
     }
 
-
     private void println(String text) {
         System.out.println("[" + getClass().getCanonicalName() + "-" + id + "]: " + text);
     }
@@ -166,5 +166,4 @@ class StageCRunnable implements Runnable {
     private void errPrintln(String text) {
         System.err.println("[" + getClass().getCanonicalName() + "-" + id + "]: " + text);
     }
-
 }

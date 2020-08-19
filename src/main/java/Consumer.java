@@ -81,14 +81,8 @@ public class Consumer {
         consumerProps.put("isolation.level", "read_committed");
         /*
             If true the consumer's offset will be periodically committed in the background.
-            In this case, it is set to FALSE in order to be committed only by the producer associated to this consumer.
          */
         consumerProps.put("enable.auto.commit", "false");
-        /*
-            It specifies what to do when there is no initial offset in Kafka or if the current offset does not exist
-            any more on the server (e.g. because that data has been deleted).
-                earliest: automatically reset the offset to the earliest offset
-         */
 
         return consumerProps;
     }
@@ -111,12 +105,20 @@ class ConsumerRunnable implements Runnable {
     public void run() {
         try {
             System.out.println("[Consumer " + id + "]: Connected. Topic: " + topics);
+            /*
+                Subscribe to the given list of topics to get dynamically assigned partitions.
+            */
             consumer.subscribe(topics);
+
             while (running) {
+                /*
+                    Fetch data for the topics or partitions specified using one of the subscribe/assign APIs
+                */
                 final ConsumerRecords<String, String> records = consumer.poll(Duration.of(10, ChronoUnit.SECONDS));
+
                 for (final ConsumerRecord<String, String> record : records) {
                     String value = record.value();
-                    println(" <<< Received -> Partition: " + record.partition() + ".\t" +
+                    println("<<< Received from Partition: " + record.partition() + ".\t" +
                             "Offset: " + record.offset() + ".\t" +
                             "Key: " + record.key() + ".\t");
                     String positives = value.split("@")[0];
@@ -134,13 +136,13 @@ class ConsumerRunnable implements Runnable {
                     String femalePercentageDeaths = statsDeaths.split("#")[2];
                     String malePercentageDeaths = statsDeaths.split("#")[3];
 
-                    println("\t--------> GLOBAL STATS <--------");
+                    println("\t###################### GLOBAL STATS ######################");
                     println("\tTotal Positives: " + positives + "\tDisease Percentage: " + diseasePercentage + "%");
-                    println("\t--------> RECOVERY STATS <--------");
+                    println("\t###################### RECOVERY STATS ######################");
                     println("\tTotal Recovered: " + recovered + "\tAverage Age: " + avgRecovered);
                     println("\tFemale Recovered: " + femalePercentageRecovered + "%" +
                             "\tMale Recovered: " + malePercentageRecovered + "%");
-                    println("\t--------> DEATHS STATS <--------");
+                    println("\t###################### DEATHS STATS ######################");
                     println("\tTotal Deaths: " + deaths + "\tAverage Age: " + avgDeaths);
                     println("\tFemale Recovered: " + femalePercentageDeaths + "%" +
                             "\tMale Recovered: " + malePercentageDeaths + "%\n");
@@ -154,6 +156,9 @@ class ConsumerRunnable implements Runnable {
                 }
             }
         } finally {
+            /*
+                Close the consumer, waiting for up to the default timeout of 30 seconds for any needed cleanup.
+             */
             consumer.close();
         }
     }
